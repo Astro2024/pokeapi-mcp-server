@@ -36,20 +36,41 @@ npm install
 npm run build
 ```
 
+## Running the server
+
+The server speaks the MCP **Streamable HTTP** transport. Start it and point an MCP client at the HTTP endpoint.
+
+```bash
+npm start                              # http://127.0.0.1:3000/mcp
+PORT=4000 npm start                    # custom port
+HOST=0.0.0.0 npm start                 # bind all interfaces (intended for fronting behind another service)
+ALLOWED_HOSTS=mcp.example.com npm start  # restrict Host header when not on localhost
+```
+
+| Env var         | Default       | Purpose                                                                     |
+|-----------------|---------------|-----------------------------------------------------------------------------|
+| `PORT`          | `3000`        | TCP port to listen on.                                                      |
+| `HOST`          | `127.0.0.1`   | Bind address. Localhost values auto-enable DNS rebinding protection.        |
+| `ALLOWED_HOSTS` | _(unset)_     | Comma-separated allowlist of `Host` header values. Use when binding `0.0.0.0`. |
+
+All requests go to `POST /mcp`. `GET` and `DELETE` return 405.
+
 ## Usage with Claude Code
 
-Add to your MCP config (`~/.claude/claude_desktop_config.json` or equivalent):
+Add to your MCP client config:
 
 ```json
 {
   "mcpServers": {
     "pokeapi": {
-      "command": "node",
-      "args": ["/path/to/pokeapi-mcp-server/dist/index.js"]
+      "type": "streamable-http",
+      "url": "http://127.0.0.1:3000/mcp"
     }
   }
 }
 ```
+
+Exact keys vary by client — consult your MCP client's docs for its HTTP transport config syntax.
 
 ## Development
 
