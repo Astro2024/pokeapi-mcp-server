@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 
 const BASE_URL = 'https://pokeapi.co/api/v2';
@@ -1216,5 +1218,32 @@ server.registerTool('get_language', { description: 'Get a language by ID or name
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
-const transport = new StdioServerTransport();
-await server.connect(transport);
+const PORT = Number(process.env.PORT ?? 3000);
+const HOST = process.env.HOST ?? '127.0.0.1';
+const ALLOWED_HOSTS = process.env.ALLOWED_HOSTS?.split(',').map(s => s.trim());
+
+const app = createMcpExpressApp({ host: HOST, allowedHosts: ALLOWED_HOSTS });
+
+app.post('/mcp', async (req: Request, res: Response) => {
+  try {
+    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    res.on('close', () => { transport.close(); });
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (err) {
+    console.error('Error handling MCP request:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ jsonrpc: '2.0', error: { code: -32603, message: 'Internal server error' }, id: null });
+    }
+  }
+});
+
+const methodNotAllowed = (_req: Request, res: Response) => {
+  res.writeHead(405).end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'Method not allowed.' }, id: null }));
+};
+app.get('/mcp', methodNotAllowed);
+app.delete('/mcp', methodNotAllowed);
+
+app.listen(PORT, HOST, () => {
+  console.error(`pokeapi-mcp-server listening on http://${HOST}:${PORT}/mcp`);
+});
